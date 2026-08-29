@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Componente — Upload de foto com pré-visualização</title>
+<style>
+  /* =====================================================================
+     COMPONENTE: foto de perfil com pré-visualização
+     ---------------------------------------------------------------------
+     - "Escolher foto": abre a galeria / arquivos (no celular, com opção
+       de câmera) via <input type="file" accept="image/*">
+     - Arrastar e soltar uma imagem no círculo (desktop)
+     - Trocar / Remover
+     - A imagem NÃO é enviada a lugar nenhum: a pré-visualização usa
+       FileReader e fica guardada só no localStorage do navegador
+     - Responsivo: tamanhos fluidos com clamp() + 1 ponto de quebra
+       (em telas < 360px os botões passam a ocupar a largura toda)
+
+     Para reutilizar em outro projeto: copie
+       1) o bloco  <div class="foto-card"> ... </div>
+       2) as regras CSS que começam com .foto-
+       3) o <script> no final
+     ===================================================================== */
+
+  :root{
+    --bg:#f4f5f7;
+    --card:#ffffff;
+    --text:#1f2933;
+    --muted:#6b7280;
+    --line:#d7dbe0;
+    --accent:#1351b4;
+    --accent-contrast:#ffffff;
+    --danger:#b3261e;
+    --ring:#1351b4;
+    --drop-bg:#eef3fb;
+    --drop-bg-active:#dde8fb;
+    --radius:14px;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0f1216; --card:#171b21; --text:#e7e9ec; --muted:#9aa4b2;
+      --line:#2b313a; --accent:#5b9bff; --accent-contrast:#0f1216;
+      --danger:#ff6b61; --ring:#5b9bff;
+      --drop-bg:#1b2330; --drop-bg-active:#243247;
+    }
+  }
+
+  *,*::before,*::after{ box-sizing:border-box }
+  body{
+    margin:0; min-height:100vh;
+    display:grid; place-items:center; padding:24px;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    background:var(--bg); color:var(--text);
+  }
+
+  /* ---------- cartão ---------- */
+  .foto-card{
+    width:100%; max-width:420px;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:clamp(20px, 5vw, 32px);
+    box-shadow:0 1px 3px rgba(0,0,0,.08), 0 8px 24px rgba(0,0,0,.06);
+    text-align:center;
+  }
+  .foto-card__title{ margin:0 0 4px; font-size:1.25rem; font-weight:700 }
+  .foto-card__hint{ margin:0 0 20px; font-size:.85rem; color:var(--muted); line-height:1.45 }
+
+  /* ---------- círculo da foto / área de "soltar" ---------- */
+  .foto-drop{
+    --size:clamp(104px, 30vw, 148px);
+    width:var(--size); height:var(--size);
+    margin:0 auto 18px;
+    position:relative; overflow:hidden;
+    border-radius:50%;
+    display:grid; place-items:center;
+    background:var(--drop-bg);
+    border:2px dashed var(--line);
+    cursor:pointer;
+    transition:border-color .15s, background .15s, transform .1s;
+  }
+  .foto-drop:hover{ border-color:var(--accent) }
+  .foto-drop:focus-visible{ outline:3px solid var(--ring); outline-offset:3px }
+  .foto-drop.is-dragover{
+    border-style:solid; border-color:var(--accent);
+    background:var(--drop-bg-active); transform:scale(1.02);
+  }
+  .foto-drop__icon{ width:44%; height:44%; color:var(--muted) }
+  .foto-drop__img{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    object-fit:cover;      /* preenche o círculo sem distorcer */
+    display:none;
+  }
+  .foto-card.has-photo .foto-drop__icon{ display:none }
+  .foto-card.has-photo .foto-drop__img{ display:block }
+  .foto-card.has-photo .foto-drop{ border-style:solid; border-color:var(--line) }
+
+  /* ---------- botões ---------- */
+  .foto-actions{ display:flex; flex-wrap:wrap; gap:10px; justify-content:center }
+  .btn{
+    appearance:none; font:inherit; font-weight:600; cursor:pointer;
+    border-radius:999px; padding:9px 18px;
+    border:1px solid transparent;
+    display:inline-flex; align-items:center; gap:8px;
+  }
+  .btn:focus-visible{ outline:3px solid var(--ring); outline-offset:2px }
+  .btn--primary{ background:var(--accent); color:var(--accent-contrast) }
+  .btn--danger{ background:transparent; color:var(--danger); border-color:currentColor }
+  .btn[hidden]{ display:none }
+
+  /* input real: invisível, mas ainda focável pelo teclado */
+  .foto-input{
+    position:absolute; width:1px; height:1px;
+    padding:0; margin:-1px; overflow:hidden;
+    clip:rect(0 0 0 0); white-space:nowrap; border:0;
+  }
+
+  .foto-status{ margin:14px 0 0; font-size:.8rem; color:var(--muted); min-height:1.2em }
+
+  /* ---------- ponto de quebra: telas bem estreitas ---------- */
+  @media (max-width:360px){
+    .foto-actions{ flex-direction:column; align-items:stretch }
+    .btn{ justify-content:center }
+  }
+</style>
+</head>
+<body>
+
+  <div class="foto-card" id="fotoCard">
+    <h1 class="foto-card__title">Foto de perfil</h1>
+    <p class="foto-card__hint">Escolha da galeria ou arraste uma imagem para o círculo · JPG, PNG ou WEBP · até 5&nbsp;MB</p>
+
+    <div class="foto-drop" id="fotoDrop" role="button" tabindex="0"
+         aria-label="Adicionar foto de perfil. Pressione Enter para escolher um arquivo, ou arraste uma imagem para cá.">
+      <svg class="foto-drop__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 2.75c-.72 0-1.37.42-1.67 1.07l-.5 1.08H6.75A2.75 2.75 0 0 0 4 8.75v9.5A2.75 2.75 0 0 0 6.75 21h10.5A2.75 2.75 0 0 0 20 18.25v-9.5a2.75 2.75 0 0 0-2.75-2.75h-3.08l-.5-1.08A1.84 1.84 0 0 0 12 2.75Zm0 5a4.75 4.75 0 1 1 0 9.5 4.75 4.75 0 0 1 0-9.5Zm0 2a2.75 2.75 0 1 0 0 5.5 2.75 2.75 0 0 0 0-5.5Z"/>
+      </svg>
+      <img class="foto-drop__img" id="fotoImg" alt="Pré-visualização da foto de perfil">
+    </div>
+
+    <div class="foto-actions">
+      <input type="file" id="fotoInput" class="foto-input" accept="image/*">
+      <label class="btn btn--primary" for="fotoInput">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        Escolher foto
+      </label>
+      <button type="button" class="btn btn--danger" id="fotoRemove" hidden>
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
+        Remover
+      </button>
+    </div>
+
+    <p class="foto-status" id="fotoStatus" role="status" aria-live="polite">A imagem fica só no seu dispositivo.</p>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  var MAX_BYTES = 5 * 1024 * 1024;          // limite: 5 MB
+  var STORE_KEY = "componenteFoto.perfil";  // chave usada no localStorage
+
+  var card      = document.getElementById("fotoCard");
+  var drop      = document.getElementById("fotoDrop");
+  var input     = document.getElementById("fotoInput");
+  var img       = document.getElementById("fotoImg");
+  var removeBtn = document.getElementById("fotoRemove");
+  var status    = document.getElementById("fotoStatus");
+
+  var LABEL_VAZIO = "Adicionar foto de perfil. Pressione Enter para escolher um arquivo, ou arraste uma imagem para cá.";
+  var LABEL_CHEIO = "Foto de perfil adicionada. Pressione Enter para trocar a imagem.";
+
+  function setStatus(msg){ status.textContent = msg; }
+
+  function mostrarFoto(dataUrl){
+    img.src = dataUrl;
+    card.classList.add("has-photo");
+    removeBtn.hidden = false;
+    drop.setAttribute("aria-label", LABEL_CHEIO);
+  }
+
+  function limparFoto(){
+    img.removeAttribute("src");
+    card.classList.remove("has-photo");
+    removeBtn.hidden = true;
+    input.value = "";
+    drop.setAttribute("aria-label", LABEL_VAZIO);
+    try { localStorage.removeItem(STORE_KEY); } catch (e) {}
+    setStatus("Foto removida.");
+  }
+
+  function tratarArquivo(file){
+    if (!file) return;
+
+    if (file.type.indexOf("image/") !== 0){
+      setStatus("Isso não é uma imagem. Escolha um arquivo JPG, PNG ou WEBP.");
+      return;
+    }
+    if (file.size > MAX_BYTES){
+      setStatus("Imagem muito grande (máximo 5 MB).");
+      return;
+    }
+
+    var reader = new FileReader();
+    reader.onload = function(){
+      var dataUrl = reader.result;
+      mostrarFoto(dataUrl);
+      setStatus("Pré-visualização carregada.");
+      try {
+        localStorage.setItem(STORE_KEY, dataUrl);   // lembra ao recarregar
+      } catch (e) {
+        setStatus("Pré-visualização carregada (grande demais para o navegador guardar entre sessões).");
+      }
+    };
+    reader.onerror = function(){ setStatus("Não foi possível ler a imagem. Tente outra."); };
+    reader.readAsDataURL(file);
+  }
+
+  /* restaura uma foto escolhida numa visita anterior */
+  try {
+    var salva = localStorage.getItem(STORE_KEY);
+    if (salva){ mostrarFoto(salva); setStatus("Foto salva anteriormente."); }
+  } catch (e) {}
+
+  /* 1) seleção pelo <input type="file"> */
+  input.addEventListener("change", function(){
+    tratarArquivo(input.files && input.files[0]);
+  });
+
+  /* 2) abrir o seletor clicando/teclando no círculo */
+  drop.addEventListener("click", function(){ input.click(); });
+  drop.addEventListener("keydown", function(e){
+    if (e.key === "Enter" || e.key === " "){ e.preventDefault(); input.click(); }
+  });
+
+  /* 3) arrastar e soltar */
+  ["dragenter","dragover"].forEach(function(ev){
+    drop.addEventListener(ev, function(e){
+      e.preventDefault(); e.stopPropagation();
+      drop.classList.add("is-dragover");
+    });
+  });
+  ["dragleave","dragend","drop"].forEach(function(ev){
+    drop.addEventListener(ev, function(e){
+      e.preventDefault(); e.stopPropagation();
+      drop.classList.remove("is-dragover");
+    });
+  });
+  drop.addEventListener("drop", function(e){
+    var dt = e.dataTransfer;
+    if (dt && dt.files && dt.files.length) tratarArquivo(dt.files[0]);
+  });
+
+  /* 4) remover */
+  removeBtn.addEventListener("click", limparFoto);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,58 @@
+TRABALHO FACUL — Reproducao de interface (mockup de estudo de front-end)
+========================================================================
+
+O QUE E
+-------
+Pagina HTML/CSS que reproduz o LAYOUT da tela "Carteira de Trabalho
+Digital" usando o padrao visual do governo (govbr-ds).
+E um EXERCICIO DE INTERFACE. Nao e documento oficial nem pagina do
+governo, e nao tem valor legal.
+
+ESTRUTURA DA PASTA
+------------------
+trabalho facul/
+├── carteirinha.html   -> A PAGINA. Autocontida: o CSS esta embutido
+│                          no proprio arquivo (<style> no <head>).
+│                          Abra este arquivo no navegador.
+├── css/
+│   └── estilos.css    -> copia dos estilos de uma versao anterior.
+│                          O carteirinha.html NAO usa este arquivo.
+│                          Pode apagar a pasta css/ se quiser.
+└── LEIA-ME.txt        -> este arquivo
+
+Nao ha JavaScript. Nao ha imagens: todos os icones e a foto (silhueta)
+sao SVG escritos direto no HTML; a marca d'agua e um SVG dentro do CSS.
+
+COMO ABRIR
+----------
+Duplo clique em carteirinha.html, ou arraste para uma aba do navegador.
+Para editar, abra a pasta no VS Code.
+
+RESPONSIVIDADE
+--------------
+Layout fluido ate 760px de conteudo, com 3 pontos de quebra:
+  <= 820px : cabecalho passa a empilhar (logo/titulo em cima,
+             saudacao + avatar embaixo)
+  <= 720px : ajustes de celular — titulos menores, card com menos
+             padding, botoes "Responder Questionario" e "Voltar"
+             ocupam a largura toda, rodape empilha
+  <= 400px : celular pequeno — logo e titulos ainda menores,
+             circulo da foto 100px, menos margem lateral
+Valores longos (nome da mae, etc.) quebram linha em vez de vazar.
+
+FONTE
+-----
+A pagina pede a fonte "Raleway" pelo Google Fonts (tag <link> no
+<head>). Com internet ela carrega a fonte exata; sem internet cai
+para Helvetica/Arial e continua legivel.
+
+
+DADOS EXIBIDOS (personagem ficticio)
+-----------------------------------
+Nome ........... Erick Vinuales De Moraes Furtado
+CPF ............ 000.000.000-00
+Nascimento ..... 27/09/2005
+Sexo ........... Masculino
+Nacionalidade .. Brasileiro
+Nome da mae .... Pathricia Rahyanne Vinuales De Moraes
+Emitida em ..... 21/05/2026
